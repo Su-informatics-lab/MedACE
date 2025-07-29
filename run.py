@@ -14,17 +14,12 @@ The script loads a demo note bundle (replace with real text) and launches two ag
 import os
 import sys
 
-from autogen_agentchat.agents import AssistantAgent
-from autogen_agentchat.teams import RoundRobinGroupChat as Team
+from autogen import AssistantAgent, GroupChat, GroupChatManager, LLMConfig
 
-# configuration
-llm_config = {
-    "model": os.getenv("OPENAI_MODEL", "o4-mini-2025-04-16"),
-    "api_key": os.getenv("OPENAI_API_KEY", "YOUR_API_KEY_HERE"),
-    # "temperature": 0.3,
-    "max_tokens": None,
-    "context_window": None,  # remove any model-side context limit
-}
+llm_config = LLMConfig(
+    api_type="openai",
+    model=os.getenv("OPENAI_MODEL", "o4-mini-2025-04-16"),
+)
 
 
 # system prompt for the extraction assistant
@@ -78,20 +73,28 @@ clinician_sys = (
 )
 
 # define agent
-extractor = AssistantAgent(
-    name="AKIExtractor",
-    system_prompt=a_extractor_sys,
-    llm_config=llm_config,
-)
-
-clinician = AssistantAgent(
-    name="ClinicianReviewer",
-    system_prompt=clinician_sys,
-    llm_config=llm_config,
-)
+with llm_config:
+    extractor = AssistantAgent(
+        name="AKIExtractor",
+        system_message=a_extractor_sys,
+    )
+    clinician = AssistantAgent(
+        name="ClinicianReviewer",
+        system_message=clinician_sys,
+    )
 
 # group chat setup
-team = Team(articipants=[extractor, clinician], name="irAKI Phenotyping Team")
+groupchat = GroupChat(
+    agents=[extractor, clinician],
+    speaker_selection_method="round_robin",
+    messages=[],
+)
+
+manager = GroupChatManager(
+    name="irAKI_manager",
+    groupchat=groupchat,
+    llm_config=llm_config,
+)
 
 
 # duck note loader
@@ -129,35 +132,32 @@ def load_demo_notes(example: int = 2) -> str:
 
 
 if __name__ == "__main__":
-    import asyncio
-
-    async def main() -> None:
-        # 1 = non‑irAKI, 2 = classic irAKI (default 2)
-        try:
-            example = int(sys.argv[1])
-            if example not in (1, 2):
-                raise ValueError
-        except (IndexError, ValueError):
-            print(
-                "Usage: python run.py [1|2]   # 1 = non‑irAKI, 2 = classic irAKI (default: 2)"
-            )
-            example = 2
-
-        print(f"\n--- Running AG2 agentic extraction on example {example} ---\n")
-        notes = load_demo_notes(example)
-
-        task_prompt = (
-            "Analyze the following note bundle and return irAKI JSON as instructed:\n"
-            f"{notes}"
+    # select demo bundle (1 = non‑irAKI, 2 = classic irAKI)
+    try:
+        example = int(sys.argv[1])
+        if example not in (1, 2):
+            raise ValueError
+    except (IndexError, ValueError):
+        print(
+            "Usage: python run.py [1|2]   # 1 = non‑irAKI, 2 = classic irAKI (default 2)"
         )
+        example = 2
 
-        # Round‑robin chat: extractor ↔ clinician until completion
-        chat_result = await team.run(task=task_prompt)
+    print(f"\n--- Running AG2 extraction on example {example} ---\n")
+    notes = load_demo_notes(example)
+    task = (
+        "Analyze the following note bundle and return irAKI JSON as instructed:\n"
+        f"{notes}"
+    )
 
-        # show full dialogue
-        for i, msg in enumerate(chat_result.messages):
-            print(f"[{i}] {msg.source}:\n{msg.content}\n")
+    # start the chat (extractor → clinician → … until done)
+    chat_result = extractor.initiate_chat(
+        recipient=manager,
+        message=task,
+    )
 
-        print("\nFinal JSON:\n", chat_result.messages[-1].content)
+    # show dialogue
+    for i, msg in enumerate(chat_result.chat_history):
+        print(f"[{i}] {msg['role']}: {msg['content']}\n")
 
-    asyncio.run(main())
+    print("\nFinal JSON:\n", chat_result.chat_history[-1]["content"])
