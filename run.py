@@ -19,7 +19,7 @@ from autogen import AssistantAgent, UserProxyAgent, GroupChat, GroupChatManager
 llm_config = {
     "model": os.getenv("OPENAI_MODEL", "o4-mini-2025-04-16"),
     "api_key": os.getenv("OPENAI_API_KEY", "YOUR_API_KEY_HERE"),
-    "temperature": 0.3,
+    # "temperature": 0.3,
     "max_tokens": None,
     "context_window": None,  # remove any model-side context limit
 }
