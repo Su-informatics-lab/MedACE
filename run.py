@@ -13,7 +13,7 @@ The script loads a demo note bundle (replace with real text) and launches two ag
 
 import os
 import sys
-from ag2 import AssistantAgent, UserAgent, Team
+from autogen import AssistantAgent, UserAgent, Team
 
 
 
