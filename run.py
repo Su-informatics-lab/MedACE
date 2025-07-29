@@ -12,10 +12,10 @@ The script loads a demo note bundle (replace with real text) and launches two ag
 """
 
 import os
-from autogen import AssistantAgent, UserProxyAgent, GroupChat, GroupChatManager
+
+from autogen import AssistantAgent, GroupChat, GroupChatManager, UserProxyAgent
 
 # configuration
-
 llm_config = {
     "model": os.getenv("OPENAI_MODEL", "o4-mini-2025-04-16"),
     "api_key": os.getenv("OPENAI_API_KEY", "YOUR_API_KEY_HERE"),
@@ -31,31 +31,31 @@ a_extractor_sys = (
     "Follow KDIGO AKI definitions, ASCO / SITC immune‑toxicity guidelines, and the literature review provided. "
     "Your task is to read a bundle of notes for ONE patient and output a STRICT JSON object with the following schema:\n\n"
     "{\n"
-    "  \"ici_exposure\": [            # ordered chronologically\n"
-    "    {\"drug\": str, \"start_date\": YYYY-MM-DD, \"stop_date\": YYYY-MM-DD | null, \"evidence\": str}\n"
+    '  "ici_exposure": [            # ordered chronologically\n'
+    '    {"drug": str, "start_date": YYYY-MM-DD, "stop_date": YYYY-MM-DD | null, "evidence": str}\n'
     "  ],\n"
-    "  \"aki_events\": [              # KDIGO events sorted chronologically\n"
-    "    {\"event_date\": YYYY-MM-DD, \"kdigo_stage\": 1|2|3, \"creatinine_change_mg_dl\": float, \"evidence\": str}\n"
+    '  "aki_events": [              # KDIGO events sorted chronologically\n'
+    '    {"event_date": YYYY-MM-DD, "kdigo_stage": 1|2|3, "creatinine_change_mg_dl": float, "evidence": str}\n'
     "  ],\n"
-    "  \"immune_attribution\": [      # sentences linking AKI to ICI\n"
-    "    {\"sentence\": str, \"negated\": bool}\n"
+    '  "immune_attribution": [      # sentences linking AKI to ICI\n'
+    '    {"sentence": str, "negated": bool}\n'
     "  ],\n"
-    "  \"management\": {              # response to suspected irAKI\n"
-    "    \"ici_action\": \"Held\"|\"Discontinued\"|\"Continued\"|\"Unknown\",\n"
-    "    \"steroids_started\": bool,\n"
-    "    \"steroid_dose_mg_per_kg\": float | null,\n"
-    "    \"biopsy_done\": bool,\n"
-    "    \"biopsy_result\": str | null,\n"
-    "    \"evidence\": str\n"
+    '  "management": {              # response to suspected irAKI\n'
+    '    "ici_action": "Held"|"Discontinued"|"Continued"|"Unknown",\n'
+    '    "steroids_started": bool,\n'
+    '    "steroid_dose_mg_per_kg": float | null,\n'
+    '    "biopsy_done": bool,\n'
+    '    "biopsy_result": str | null,\n'
+    '    "evidence": str\n'
     "  },\n"
-    "  \"outcome\": {\n"
-    "    \"recovery_status\": \"Full\"|\"Partial\"|\"None\"|\"Unknown\",\n"
-    "    \"dialysis\": bool,\n"
-    "    \"latest_creatinine\": float | null,\n"
-    "    \"evidence\": str\n"
+    '  "outcome": {\n'
+    '    "recovery_status": "Full"|"Partial"|"None"|"Unknown",\n'
+    '    "dialysis": bool,\n'
+    '    "latest_creatinine": float | null,\n'
+    '    "evidence": str\n'
     "  },\n"
-    "  \"iraki_label\": \"Probable\"|\"Possible\"|\"Unlikely\",  # based on extracted evidence\n"
-    "  \"confidence\": float                 # 0.0–1.0 subjective confidence\n"
+    '  "iraki_label": "Probable"|"Possible"|"Unlikely",  # based on extracted evidence\n'
+    '  "confidence": float                 # 0.0–1.0 subjective confidence\n'
     "}\n\n"
     "Guidelines:\n"
     "1. Use ISO dates (YYYY‑MM‑DD). If only a month/year is present, approximate with the first of the month and add 'approx.' in evidence.\n"
@@ -93,6 +93,7 @@ clinician = UserProxyAgent(
 chat = GroupChat(agents=[extractor, clinician], messages=[])
 manager = GroupChatManager(groupchat=chat, llm_config=llm_config)
 
+
 # duck note loader
 def load_demo_notes(example: int = 2) -> str:
     """
@@ -101,39 +102,27 @@ def load_demo_notes(example: int = 2) -> str:
     """
     # EXAMPLE 1: ESRD, falls, no ICI, not irAKI
     note_bundle_1 = (
-        "ADMISSION HISTORY AND PHYSICAL
-"
-        "ADMISSION DATE: 2024-08-29
-"
-        "Reason for Admission: Recurrent falls
-"
+        "ADMISSION HISTORY AND PHYSICAL"
+        "ADMISSION DATE: 2024-08-29"
+        "Reason for Admission: Recurrent falls"
         "History: 59-year-old male with IgD lambda MM (on daratumumab), meningioma, "
         "lambda light chain amyloidosis, acquired Factor X deficiency, ESRD on MWF dialysis, "
         "presented after fall. Recent labs: creatinine 5.01, baseline ESRD. No mention of immunotherapy. "
         "Assessment: ESRD, plan for regular dialysis. "
         "Physical therapy note: patient worked on transfers, no complaints of pain."
-        "
-
-"
-        "RADIOLOGY IMPRESSION (XR Pelvis 8/29/2024): No acute bony findings. Old fracture deformities noted.
-"
+        "RADIOLOGY IMPRESSION (XR Pelvis 8/29/2024): No acute bony findings. Old fracture deformities noted."
     )
 
     # EXAMPLE 2: classic irAKI with ICI exposure
     note_bundle_2 = (
-        "ONCOLOGY PROGRESS NOTE
-"
-        "ENCOUNTER DATE: 2023-03-14
-"
+        "ONCOLOGY PROGRESS NOTE"
+        "ENCOUNTER DATE: 2023-03-14"
         "History: 67-year-old female with metastatic melanoma started nivolumab on 2023-01-15. "
-        "After 2 cycles, creatinine rose from 0.9 to 3.2 mg/dL. Nephrology consulted.
-"
+        "After 2 cycles, creatinine rose from 0.9 to 3.2 mg/dL. Nephrology consulted."
         "NEPHROLOGY CONSULT NOTE (2023-03-28): 'Acute kidney injury, likely related to immune checkpoint inhibitor therapy (nivolumab); "
         "KDIGO Stage 2; started methylprednisolone 1 mg/kg; nivolumab held.' "
-        "Renal biopsy (2023-03-29): 'Interstitial nephritis consistent with ICI-associated AIN.'
-"
-        "DISCHARGE SUMMARY (2023-04-10): 'Creatinine improved to 1.5, partial recovery; steroids tapered.'
-"
+        "Renal biopsy (2023-03-29): 'Interstitial nephritis consistent with ICI-associated AIN.'"
+        "DISCHARGE SUMMARY (2023-04-10): 'Creatinine improved to 1.5, partial recovery; steroids tapered.'"
     )
 
     return note_bundle_1 if example == 1 else note_bundle_2
@@ -145,16 +134,21 @@ if __name__ == "__main__":
         example = int(sys.argv[1])
         assert example in [1, 2]
     except (IndexError, ValueError, AssertionError):
-        print("Usage: python run.py [1|2]   # 1=non-irAKI, 2=classic irAKI (default: 2)")
+        print(
+            "Usage: python run.py [1|2]   # 1=non-irAKI, 2=classic irAKI (default: 2)"
+        )
         example = 2
 
     print(f"\n--- Running agentic extraction on example {example} ---\n")
     notes = load_demo_notes(example)
     chat.messages.clear()
-    manager.send_message({
-        "role": "user",
-        "content": "Analyze the following note bundle and return irAKI JSON as instructed:\n" + notes,
-    })
+    manager.send_message(
+        {
+            "role": "user",
+            "content": "Analyze the following note bundle and return irAKI JSON as instructed:\n"
+            + notes,
+        }
+    )
 
     # print out chat history
     for i, msg in enumerate(chat.messages):
