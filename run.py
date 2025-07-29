@@ -1,7 +1,7 @@
 """run.py
 Module‑level docstring
-Prototype AutoGen team for extracting immune‑related acute kidney injury (irAKI)
-evidence from clinical notes.
+Prototype AG2 team for extracting immune‑related acute kidney injury (irAKI) evidence
+from clinical notes.
 
 Usage
 -----
@@ -12,8 +12,11 @@ The script loads a demo note bundle (replace with real text) and launches two ag
 """
 
 import os
+import sys
+from ag2 import AssistantAgent, UserAgent, Team
 
-from autogen import AssistantAgent, GroupChat, GroupChatManager, UserProxyAgent
+
+
 
 # configuration
 llm_config = {
@@ -78,20 +81,22 @@ clinician_sys = (
 # define agent
 extractor = AssistantAgent(
     name="AKIExtractor",
-    system_message=a_extractor_sys,
+    system_prompt=a_extractor_sys,
     llm_config=llm_config,
 )
 
-clinician = UserProxyAgent(
+clinician = UserAgent(
     name="ClinicianReviewer",
-    system_message=clinician_sys,
-    human_input_mode="NEVER",  # fully automated review
+    system_prompt=clinician_sys,
     llm_config=llm_config,
+    # You can add: "input_mode": "NEVER" or similar if AG2 supports it.
 )
 
 # group chat setup
-chat = GroupChat(agents=[extractor, clinician], messages=[])
-manager = GroupChatManager(groupchat=chat, llm_config=llm_config)
+team = Team(
+    agents=[extractor, clinician],
+    name="irAKI Phenotyping Team"
+)
 
 
 # duck note loader
@@ -129,27 +134,24 @@ def load_demo_notes(example: int = 2) -> str:
 
 
 if __name__ == "__main__":
-    # get example to run from command-line (default: 2)
+    # choose which note bundle to use: 1 = non-irAKI; 2 = classic irAKI
     try:
         example = int(sys.argv[1])
         assert example in [1, 2]
     except (IndexError, ValueError, AssertionError):
-        print(
-            "Usage: python run.py [1|2]   # 1=non-irAKI, 2=classic irAKI (default: 2)"
-        )
+        print("Usage: python run.py [1|2]   # 1=non-irAKI, 2=classic irAKI (default: 2)")
         example = 2
 
-    print(f"\n--- Running agentic extraction on example {example} ---\n")
+    print(f"\n--- Running AG2 agentic extraction on example {example} ---\n")
     notes = load_demo_notes(example)
-    chat.messages.clear()
-    manager.send_message(
-        {
-            "role": "user",
-            "content": "Analyze the following note bundle and return irAKI JSON as instructed:\n"
-            + notes,
-        }
+
+    # Team call: user asks question to team (triggers agent turn-taking)
+    result = team.user_proxy().ask(
+        f"Analyze the following note bundle and return irAKI JSON as instructed:\n{notes}"
     )
 
-    # print out chat history
-    for i, msg in enumerate(chat.messages):
+    # print the full team chat history
+    for i, msg in enumerate(team.chat_history()):
         print(f"[Message {i}]\nRole: {msg['role']}\nContent:\n{msg['content']}\n")
+
+    print("\n\nFinal output:\n", result)
