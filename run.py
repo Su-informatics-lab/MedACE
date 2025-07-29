@@ -13,9 +13,7 @@ The script loads a demo note bundle (replace with real text) and launches two ag
 
 import os
 import sys
-from autogen import AssistantAgent, UserAgent, Team
-
-
+from autogen import AssistantAgent, Team
 
 
 # configuration
@@ -85,11 +83,10 @@ extractor = AssistantAgent(
     llm_config=llm_config,
 )
 
-clinician = UserAgent(
+clinician = AssistantAgent(
     name="ClinicianReviewer",
     system_prompt=clinician_sys,
     llm_config=llm_config,
-    # You can add: "input_mode": "NEVER" or similar if AG2 supports it.
 )
 
 # group chat setup
