@@ -139,7 +139,7 @@ if __name__ == "__main__":
             raise ValueError
     except (IndexError, ValueError):
         print(
-            "Usage: python run.py [1|2]   # 1 = non‑irAKI, 2 = classic irAKI (default 2)"
+            "Usage: python run.py [1|2]   # 1 = non‑irAKI, 2 = classic irAKI (default 2)"
         )
         example = 2
 
