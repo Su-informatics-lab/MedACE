@@ -13,8 +13,9 @@ The script loads a demo note bundle (replace with real text) and launches two ag
 
 import os
 import sys
-from autogen import AssistantAgent, Team
 
+from autogen_agentchat.agents import AssistantAgent
+from autogen_agentchat.teams import RoundRobinGroupChat as Team
 
 # configuration
 llm_config = {
@@ -90,10 +91,7 @@ clinician = AssistantAgent(
 )
 
 # group chat setup
-team = Team(
-    agents=[extractor, clinician],
-    name="irAKI Phenotyping Team"
-)
+team = Team(articipants=[extractor, clinician], name="irAKI Phenotyping Team")
 
 
 # duck note loader
@@ -131,24 +129,35 @@ def load_demo_notes(example: int = 2) -> str:
 
 
 if __name__ == "__main__":
-    # choose which note bundle to use: 1 = non-irAKI; 2 = classic irAKI
-    try:
-        example = int(sys.argv[1])
-        assert example in [1, 2]
-    except (IndexError, ValueError, AssertionError):
-        print("Usage: python run.py [1|2]   # 1=non-irAKI, 2=classic irAKI (default: 2)")
-        example = 2
+    import asyncio
 
-    print(f"\n--- Running AG2 agentic extraction on example {example} ---\n")
-    notes = load_demo_notes(example)
+    async def main() -> None:
+        # 1 = non‑irAKI, 2 = classic irAKI (default 2)
+        try:
+            example = int(sys.argv[1])
+            if example not in (1, 2):
+                raise ValueError
+        except (IndexError, ValueError):
+            print(
+                "Usage: python run.py [1|2]   # 1 = non‑irAKI, 2 = classic irAKI (default: 2)"
+            )
+            example = 2
 
-    # Team call: user asks question to team (triggers agent turn-taking)
-    result = team.user_proxy().ask(
-        f"Analyze the following note bundle and return irAKI JSON as instructed:\n{notes}"
-    )
+        print(f"\n--- Running AG2 agentic extraction on example {example} ---\n")
+        notes = load_demo_notes(example)
 
-    # print the full team chat history
-    for i, msg in enumerate(team.chat_history()):
-        print(f"[Message {i}]\nRole: {msg['role']}\nContent:\n{msg['content']}\n")
+        task_prompt = (
+            "Analyze the following note bundle and return irAKI JSON as instructed:\n"
+            f"{notes}"
+        )
 
-    print("\n\nFinal output:\n", result)
+        # Round‑robin chat: extractor ↔ clinician until completion
+        chat_result = await team.run(task=task_prompt)
+
+        # show full dialogue
+        for i, msg in enumerate(chat_result.messages):
+            print(f"[{i}] {msg.source}:\n{msg.content}\n")
+
+        print("\nFinal JSON:\n", chat_result.messages[-1].content)
+
+    asyncio.run(main())
