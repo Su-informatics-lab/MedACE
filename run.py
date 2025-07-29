@@ -14,10 +14,10 @@ The script loads a demo note bundle (replace with real text) and launches two ag
 import os
 from autogen import AssistantAgent, UserProxyAgent, GroupChat, GroupChatManager
 
-# configuration – replace with your own model or API key
+# configuration
 
 llm_config = {
-    "model": os.getenv("OPENAI_MODEL", "gpt-4o"),
+    "model": os.getenv("OPENAI_MODEL", "o4-mini-2025-04-16"),
     "api_key": os.getenv("OPENAI_API_KEY", "YOUR_API_KEY_HERE"),
     "temperature": 0.3,
     "max_tokens": None,
